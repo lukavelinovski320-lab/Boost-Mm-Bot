@@ -448,20 +448,22 @@ async def proof_command(ctx):
     await ctx.reply('✅ Proof sent successfully!')
 
 # Helper Functions
-async def create_ticket_with_details(guild, user, tier, trader, giving, receiving, both_join, tip):
+async def create_ticket_with_details(
+    guild, user, tier, trader, giving, receiving, both_join, tip
+):
     """Create MM ticket"""
     try:
         category = discord.utils.get(guild.categories, name=TICKET_CATEGORY)
         if not category:
             category = await guild.create_category(TICKET_CATEGORY)
-        
+
         mm_role_ids = list(MM_ROLE_IDS.values())
-        
+
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             user: discord.PermissionOverwrite(
-                view_channel=True, 
-                send_messages=True, 
+                view_channel=True,
+                send_messages=True,
                 read_message_history=True,
                 mention_everyone=True
             ),
@@ -472,7 +474,7 @@ async def create_ticket_with_details(guild, user, tier, trader, giving, receivin
                 manage_messages=True
             )
         }
-        
+
         for role_id in mm_role_ids:
             role = guild.get_role(role_id)
             if role:
@@ -482,62 +484,65 @@ async def create_ticket_with_details(guild, user, tier, trader, giving, receivin
                     read_message_history=True,
                     manage_messages=True
                 )
-        
+
         ticket_channel = await guild.create_text_channel(
-            name=f'ticket-{user.name}-mm',
+            name=f"ticket-{user.name}-mm",
             category=category,
             overwrites=overwrites
         )
-        
+
         active_tickets[ticket_channel.id] = {
-            'user_id': user.id,
-            'created_at': datetime.utcnow().isoformat(),
-            'tier': tier,
-            'trader': trader,
-            'giving': giving,
-            'receiving': receiving,
-            'both_join': both_join,
-            'tip': tip
+            "user_id": user.id,
+            "created_at": datetime.utcnow().isoformat(),
+            "tier": tier,
+            "trader": trader,
+            "giving": giving,
+            "receiving": receiving,
+            "both_join": both_join,
+            "tip": tip
         }
-        
+
         tier_role_id = MM_ROLE_IDS.get(tier)
         tier_role = guild.get_role(tier_role_id) if tier_role_id else None
-        
+
         if tier_role:
-            ping_message = f"{tier_role.mention} - New {MM_TIERS[tier]['name']} ticket opened!"
-            await ticket_channel.send(ping_message, allowed_mentions=discord.AllowedMentions(roles=True))
+            await ticket_channel.send(
+                f"{tier_role.mention} - New {MM_TIERS[tier]['name']} ticket opened!",
+                allowed_mentions=discord.AllowedMentions(roles=True)
+            )
 
         embed = discord.Embed(
-    title=f"⚖️ {MM_TIERS[tier]['name']} Ticket",
-    description=(
-        f"**📋 Middleman Trade Request**\n\n"
-        f"**Selected Tier:** {MM_TIERS[tier]['name']}\n"
-        f"**Range:** {MM_TIERS[tier]['range']}"
-    ),
-    color=MM_COLOR
-)
+            title=f"⚖️ {MM_TIERS[tier]['name']} Ticket",
+            description=(
+                "**📋 Middleman Trade Request**\n\n"
+                f"**Selected Tier:** {MM_TIERS[tier]['name']}\n"
+                f"**Range:** {MM_TIERS[tier]['range']}"
+            ),
+            color=MM_COLOR
+        )
 
-embed.add_field(name="🤝 Trading With", value=trader, inline=False)
-embed.add_field(name="📤 Requester Giving", value=giving, inline=False)
-embed.add_field(name="📥 Requester Receiving", value=receiving, inline=False)
-embed.add_field(name="🔗 Both Can Join Links?", value=both_join, inline=False)
-embed.add_field(name="💰 Tip", value=tip, inline=False)
+        embed.add_field(name="🤝 Trading With", value=trader, inline=False)
+        embed.add_field(name="📤 Requester Giving", value=giving, inline=False)
+        embed.add_field(name="📥 Requester Receiving", value=receiving, inline=False)
+        embed.add_field(name="🔗 Both Can Join Links?", value=both_join, inline=False)
+        embed.add_field(name="💰 Tip", value=tip, inline=False)
 
-embed.set_footer(
-    text=f"Ticket created by {user}",
-    icon_url=user.display_avatar.url
-)
-embed.timestamp = datetime.utcnow()
+        embed.set_footer(
+            text=f"Ticket created by {user}",
+            icon_url=user.display_avatar.url
+        )
+        embed.timestamp = datetime.utcnow()
 
-await ticket_channel.send(
-    content=user.mention,
-    embed=embed
-    )
-        
-        await ticket_channel.send(embed=details_embed, view=MMTicketView())
-        
+        await ticket_channel.send(
+            content=user.mention,
+            embed=embed
+        )
+
+        # Optional: ticket controls view (only if MMTicketView exists)
+        await ticket_channel.send(view=MMTicketView())
+
     except Exception as e:
-        print(f'[ERROR] MM Ticket creation failed: {e}')
+        print(f"[ERROR] MM Ticket creation failed: {e}")
         raise
 
 async def close_ticket(channel, user):
