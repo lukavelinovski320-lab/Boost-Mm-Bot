@@ -270,7 +270,7 @@ async def setup(ctx):
     """Create MM ticket panel"""
     embed = discord.Embed(
         title='⚖️ Middleman Services',
-        description='Click the button below to open a middleman ticket.\n\n**Available Tiers:**\n🟢 **0-150M** - Basic trades\n🔵 **150-500M** - Advanced trades\n🟣 **500M+** - Premium trades\n💎 **OG Middleman** - VIP service',
+        description='Click the button below to open a middleman ticket.\n\n**Available Tiers:**\n🟢 **0-150M** - Trades up to 150m\n🔵 **150-500M** - Trades Up To 500m\n🟣 **500M+** - Trades Above 500m\n💎 **OG Middleman** - Og Trades Only',
         color=MM_COLOR
     )
     embed.set_footer(text='Select your tier to get started')
@@ -507,11 +507,6 @@ async def create_ticket_with_details(guild, user, tier, trader, giving, receivin
             ping_message = f"{tier_role.mention} - New {MM_TIERS[tier]['name']} ticket opened!"
             await ticket_channel.send(ping_message, allowed_mentions=discord.AllowedMentions(roles=True))
         
-        embed = discord.Embed(
-            title=f"⚖️ {MM_TIERS[tier]['name']} Ticket",
-            description=f"Welcome {user.mention}!\n\nOur team will be with you shortly.",
-            color=MM_COLOR
-        )
         embed.set_footer(text=f'Ticket created by {user}', icon_url=user.display_avatar.url)
         embed.timestamp = datetime.utcnow()
         
