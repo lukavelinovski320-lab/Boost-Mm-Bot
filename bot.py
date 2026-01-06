@@ -508,28 +508,31 @@ async def create_ticket_with_details(guild, user, tier, trader, giving, receivin
             await ticket_channel.send(ping_message, allowed_mentions=discord.AllowedMentions(roles=True))
 
         embed = discord.Embed(
-            title=f"⚖️ {MM_TIERS[tier]['name']} Ticket",
-            color=MM_COLOR
-        )
-        embed.set_footer(text=f'Ticket created by {user}', icon_url=user.display_avatar.url)
-        embed.timestamp = datetime.utcnow()
-        
-        await ticket_channel.send(content=user.mention, embed=embed)
-        
-        details_embed = discord.Embed(
-            title='📋 Middleman Trade Request',
-            description=f'**Selected Tier:** {MM_TIERS[tier]["name"]}\n**Range:** {MM_TIERS[tier]["range"]}',
-            color=MM_COLOR
-        )
-        
-        details_embed.add_field(name='Trading With', value=trader, inline=False)
-        details_embed.add_field(name='Requester Giving', value=giving, inline=False)
-        details_embed.add_field(name='Requester Receiving', value=receiving, inline=False)
-        details_embed.add_field(name='Both Can Join Links?', value=both_join, inline=False)
-        details_embed.add_field(name='Tip', value=tip, inline=False)
-        
-        details_embed.set_footer(text=f'Requested by {user}', icon_url=user.display_avatar.url)
-        details_embed.timestamp = datetime.utcnow()
+    title=f"⚖️ {MM_TIERS[tier]['name']} Ticket",
+    description=(
+        f"📋 **Middleman Trade Request**\n\n"
+        f"**Selected Tier:** {MM_TIERS[tier]['name']}\n"
+        f"**Range:** {MM_TIERS[tier]['range']}"
+    ),
+    color=MM_COLOR
+)
+
+embed.add_field(name="🤝 Trading With", value=trader, inline=False)
+embed.add_field(name="📤 Requester Giving", value=giving, inline=False)
+embed.add_field(name="📥 Requester Receiving", value=receiving, inline=False)
+embed.add_field(name="🔗 Both Can Join Links?", value=both_join, inline=False)
+embed.add_field(name="💰 Tip", value=tip, inline=False)
+
+embed.set_footer(
+    text=f"Ticket created by {user}",
+    icon_url=user.display_avatar.url
+)
+embed.timestamp = datetime.utcnow()
+
+await ticket_channel.send(
+    content=user.mention,
+    embed=embed
+    )
         
         await ticket_channel.send(embed=details_embed, view=MMTicketView())
         
