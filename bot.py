@@ -1150,28 +1150,7 @@ async def create_ticket_with_details(guild, user, tier, trader, giving, receivin
         print(f'[ERROR] MM Ticket creation failed: {e}')
         raise
 
-async def close_ticket(channel, user):
-    """Close ticket"""
-    embed = discord.Embed(
-        title='🔒 Ticket Closed',
-        description=f'Ticket closed by {user.mention}',
-        color=0xED4245
-    )
-    embed.timestamp = datetime.utcnow()
-
-    await channel.send(embed=embed)
-
-    if channel.id in active_tickets:
-        del active_tickets[channel.id]
-    if channel.id in claimed_tickets:
-        del claimed_tickets[channel.id]
-    
-    save_data()
-
-    await asyncio.sleep(5)
-    await channel.delete()
-
- async def create_support_ticket(guild, user, reason, details):
+async def create_support_ticket(guild, user, reason, details):
     """Create a support ticket with staff ping and ghost ping"""
     try:
         category = discord.utils.get(guild.categories, name=SUPPORT_CATEGORY)
@@ -1258,6 +1237,28 @@ async def close_ticket(channel, user):
     except Exception as e:
         print(f'[ERROR] Support Ticket creation failed: {e}')
         raise
+
+async def close_ticket(channel, user):
+    """Close ticket"""
+    embed = discord.Embed(
+        title='🔒 Ticket Closed',
+        description=f'Ticket closed by {user.mention}',
+        color=0xED4245
+    )
+    embed.timestamp = datetime.utcnow()
+
+    await channel.send(embed=embed)
+
+    if channel.id in active_tickets:
+        del active_tickets[channel.id]
+    if channel.id in claimed_tickets:
+        del claimed_tickets[channel.id]
+    
+    save_data()
+
+    await asyncio.sleep(5)
+    await channel.delete()
+
         
 # Run Bot
 if __name__ == '__main__':
