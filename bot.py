@@ -4,6 +4,7 @@ from discord.ui import Button, View, Select, Modal, TextInput
 import os
 import json
 import random
+import secrets
 from datetime import datetime
 import asyncio
 from flask import Flask
@@ -393,7 +394,7 @@ class CoinflipView(View):
             await asyncio.sleep(1)
             await self.start_coinflip(interaction)
     
-    async def start_coinflip(self, interaction):  # ← FIXED: Removed extra space before 'async'
+    async def start_coinflip(self, interaction):
         for item in self.children:
             item.disabled = True
         
@@ -413,20 +414,43 @@ class CoinflipView(View):
         user2_wins = 0
         rounds_played = 0
         results = []
+        last_winner = None  # Track last winner
+        streak_count = 0    # Track streak length
         
         # FIXED: Different logic for First To vs Best Of
         if self.is_first_to:
             # First to X: Keep going until someone reaches X wins
             while user1_wins < self.total_rounds and user2_wins < self.total_rounds:
-                flip_result = random.choice(['heads', 'tails'])
+                # ANTI-STREAK LOGIC: If 3+ streak, slightly favor the other side
+                if streak_count >= 3:
+                    # 60% chance to break the streak
+                    rand_num = secrets.randbelow(100)
+                    if last_winner == 'user1':
+                        flip_result = self.user2_choice if rand_num < 60 else self.user1_choice
+                    else:
+                        flip_result = self.user1_choice if rand_num < 60 else self.user2_choice
+                else:
+                    # Normal 50/50 flip using secrets module
+                    flip_result = 'heads' if secrets.randbelow(2) == 0 else 'tails'
+                
                 rounds_played += 1
                 
                 if flip_result == self.user1_choice:
                     user1_wins += 1
                     results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
+                    if last_winner == 'user1':
+                        streak_count += 1
+                    else:
+                        streak_count = 1
+                        last_winner = 'user1'
                 else:
                     user2_wins += 1
                     results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
+                    if last_winner == 'user2':
+                        streak_count += 1
+                    else:
+                        streak_count = 1
+                        last_winner = 'user2'
                 
                 progress_embed = discord.Embed(
                     title='🪙 Coinflip in Progress...',
@@ -442,18 +466,38 @@ class CoinflipView(View):
                 await asyncio.sleep(1.5)
         else:
             # Best of X: Play exactly X rounds, winner has most wins
-            rounds_to_win = (self.total_rounds // 2) + 1  # e.g., bo10 = need 6 wins
+            rounds_to_win = (self.total_rounds // 2) + 1
             
             while rounds_played < self.total_rounds:
-                flip_result = random.choice(['heads', 'tails'])
+                # ANTI-STREAK LOGIC
+                if streak_count >= 3:
+                    rand_num = secrets.randbelow(100)
+                    if last_winner == 'user1':
+                        flip_result = self.user2_choice if rand_num < 60 else self.user1_choice
+                    else:
+                        flip_result = self.user1_choice if rand_num < 60 else self.user2_choice
+                else:
+                    # Normal 50/50 flip using secrets module
+                    flip_result = 'heads' if secrets.randbelow(2) == 0 else 'tails'
+                
                 rounds_played += 1
                 
                 if flip_result == self.user1_choice:
                     user1_wins += 1
                     results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
+                    if last_winner == 'user1':
+                        streak_count += 1
+                    else:
+                        streak_count = 1
+                        last_winner = 'user1'
                 else:
                     user2_wins += 1
                     results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
+                    if last_winner == 'user2':
+                        streak_count += 1
+                    else:
+                        streak_count = 1
+                        last_winner = 'user2'
                 
                 # Early finish if someone already won majority
                 if user1_wins >= rounds_to_win or user2_wins >= rounds_to_win:
@@ -992,7 +1036,7 @@ async def simple_coinflip(ctx):
     await asyncio.sleep(1.5)
     
     # Get result
-    result = random.choice(['Heads', 'Tails'])
+    result = 'Heads' if secrets.randbelow(2) == 0 else 'Tails'
     
     # Result embed
     result_embed = discord.Embed(
