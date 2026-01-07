@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord.ui import Button, View, Select, Modal, TextInput
 import os
 import json
+import random
 from datetime import datetime
 import asyncio
 from flask import Flask
@@ -238,6 +239,167 @@ class TierSelectView(View):
         super().__init__(timeout=None)
         self.add_item(TierSelect())
 
+# Coinflip Button View
+class CoinflipView(View):
+    def __init__(self, user1, user2, total_rounds, is_first_to):
+        super().__init__(timeout=60)
+        self.user1 = user1
+        self.user2 = user2
+        self.total_rounds = total_rounds
+        self.is_first_to = is_first_to
+        self.user1_choice = None
+        self.user2_choice = None
+        self.chosen_users = []
+    
+    @discord.ui.button(label='Heads', emoji='🪙', style=discord.ButtonStyle.primary, custom_id='heads_cf')
+    async def heads_button(self, interaction: discord.Interaction, button: Button):
+        if interaction.user.id not in [self.user1.id, self.user2.id]:
+            return await interaction.response.send_message('❌ You are not part of this coinflip!', ephemeral=True)
+        
+        if interaction.user.id in self.chosen_users:
+            return await interaction.response.send_message('❌ You already made your choice!', ephemeral=True)
+        
+        if interaction.user.id == self.user1.id:
+            self.user1_choice = 'heads'
+        else:
+            self.user2_choice = 'heads'
+        
+        self.chosen_users.append(interaction.user.id)
+        button.disabled = True
+        
+        mode_text = f"First to {self.total_rounds}" if self.is_first_to else f"Best of {self.total_rounds}"
+        embed = discord.Embed(
+            title='🪙 Choose Your Side',
+            description=f'**{self.user1.mention}** vs **{self.user2.mention}**\n\n**Mode:** {mode_text}\n\n**Select your side below:**',
+            color=MM_COLOR
+        )
+        
+        if self.user1_choice:
+            embed.add_field(name=f'{self.user1.display_name} has chosen', value=f'**{self.user1_choice.upper()}**', inline=False)
+        if self.user2_choice:
+            embed.add_field(name=f'{self.user2.display_name} has chosen', value=f'**{self.user2_choice.upper()}**', inline=False)
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+        
+        if len(self.chosen_users) == 2:
+            await asyncio.sleep(1)
+            await self.start_coinflip(interaction)
+    
+    @discord.ui.button(label='Tails', emoji='🪙', style=discord.ButtonStyle.secondary, custom_id='tails_cf')
+    async def tails_button(self, interaction: discord.Interaction, button: Button):
+        if interaction.user.id not in [self.user1.id, self.user2.id]:
+            return await interaction.response.send_message('❌ You are not part of this coinflip!', ephemeral=True)
+        
+        if interaction.user.id in self.chosen_users:
+            return await interaction.response.send_message('❌ You already made your choice!', ephemeral=True)
+        
+        if interaction.user.id == self.user1.id:
+            self.user1_choice = 'tails'
+        else:
+            self.user2_choice = 'tails'
+        
+        self.chosen_users.append(interaction.user.id)
+        button.disabled = True
+        
+        mode_text = f"First to {self.total_rounds}" if self.is_first_to else f"Best of {self.total_rounds}"
+        embed = discord.Embed(
+            title='🪙 Choose Your Side',
+            description=f'**{self.user1.mention}** vs **{self.user2.mention}**\n\n**Mode:** {mode_text}\n\n**Select your side below:**',
+            color=MM_COLOR
+        )
+        
+        if self.user1_choice:
+            embed.add_field(name=f'{self.user1.display_name} has chosen', value=f'**{self.user1_choice.upper()}**', inline=False)
+        if self.user2_choice:
+            embed.add_field(name=f'{self.user2.display_name} has chosen', value=f'**{self.user2_choice.upper()}**', inline=False)
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+        
+        if len(self.chosen_users) == 2:
+            await asyncio.sleep(1)
+            await self.start_coinflip(interaction)
+    
+    async def start_coinflip(self, interaction):
+        for item in self.children:
+            item.disabled = True
+        
+        mode_text = f"First to {self.total_rounds}" if self.is_first_to else f"Best of {self.total_rounds}"
+        
+        start_embed = discord.Embed(
+            title='🪙 Coinflip Starting!',
+            description=f'**{self.user1.mention}** chose **{self.user1_choice.upper()}**\n**{self.user2.mention}** chose **{self.user2_choice.upper()}**\n\n**Mode:** {mode_text}',
+            color=MM_COLOR
+        )
+        start_embed.timestamp = datetime.utcnow()
+        
+        await interaction.message.edit(embed=start_embed, view=self)
+        await asyncio.sleep(2)
+        
+        user1_wins = 0
+        user2_wins = 0
+        rounds_played = 0
+        results = []
+        
+        while rounds_played < self.total_rounds:
+            flip_result = random.choice(['heads', 'tails'])
+            rounds_played += 1
+            
+            if flip_result == self.user1_choice:
+                user1_wins += 1
+                results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
+            else:
+                user2_wins += 1
+                results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
+            
+            if self.is_first_to and (user1_wins >= self.total_rounds or user2_wins >= self.total_rounds):
+                break
+            
+            progress_embed = discord.Embed(
+                title='🪙 Coinflip in Progress...',
+                description=f'**{self.user1.mention}** ({self.user1_choice.upper()}): {user1_wins} wins\n**{self.user2.mention}** ({self.user2_choice.upper()}): {user2_wins} wins\n\n**Mode:** {mode_text}\n**Rounds Played:** {rounds_played}/{self.total_rounds}',
+                color=0xFFA500
+            )
+            
+            recent_results = '\n'.join(results[-5:])
+            progress_embed.add_field(name='Recent Results', value=recent_results if recent_results else 'None yet', inline=False)
+            progress_embed.timestamp = datetime.utcnow()
+            
+            await interaction.message.edit(embed=progress_embed, view=self)
+            await asyncio.sleep(1.5)
+        
+        if user1_wins > user2_wins:
+            final_winner = self.user1
+            final_color = 0x57F287
+        elif user2_wins > user1_wins:
+            final_winner = self.user2
+            final_color = 0x57F287
+        else:
+            final_winner = None
+            final_color = 0xFEE75C
+        
+        final_embed = discord.Embed(
+            title='🪙 Coinflip Complete!',
+            color=final_color
+        )
+        
+        if final_winner:
+            final_embed.description = f'🎊 **{final_winner.mention} WINS!** 🎊\n\n**Final Score:**\n{self.user1.mention}: {user1_wins} wins\n{self.user2.mention}: {user2_wins} wins'
+        else:
+            final_embed.description = f'🤝 **IT\'S A TIE!** 🤝\n\n**Final Score:**\n{self.user1.mention}: {user1_wins} wins\n{self.user2.mention}: {user2_wins} wins'
+        
+        final_embed.add_field(name='Mode', value=mode_text, inline=True)
+        final_embed.add_field(name='Total Rounds', value=str(rounds_played), inline=True)
+        
+        if rounds_played <= 10:
+            all_results = '\n'.join(results)
+            final_embed.add_field(name='All Results', value=all_results, inline=False)
+        else:
+            recent_results = '\n'.join(results[-10:])
+            final_embed.add_field(name='Last 10 Results', value=recent_results, inline=False)
+
+        
+        await interaction.message.edit(embed=final_embed, view=self)
+
 # MM Ticket View
 class MMTicketView(View):
     def __init__(self):
@@ -297,191 +459,6 @@ class MMTicketView(View):
     async def close_button(self, interaction: discord.Interaction, button: Button):
         await interaction.response.defer()
         await close_ticket(interaction.channel, interaction.user)
-
-# Coinflip Button View
-class CoinflipView(View):
-    def __init__(self, user1, user2, total_rounds, is_first_to):
-        super().__init__(timeout=60)
-        self.user1 = user1
-        self.user2 = user2
-        self.total_rounds = total_rounds
-        self.is_first_to = is_first_to
-        self.user1_choice = None
-        self.user2_choice = None
-        self.chosen_users = []
-    
-    @discord.ui.button(label='Heads', emoji='🪙', style=discord.ButtonStyle.primary, custom_id='heads_cf')
-    async def heads_button(self, interaction: discord.Interaction, button: Button):
-        # Check if user is one of the two players
-        if interaction.user.id not in [self.user1.id, self.user2.id]:
-            return await interaction.response.send_message('❌ You are not part of this coinflip!', ephemeral=True)
-        
-        # Check if user already chose
-        if interaction.user.id in self.chosen_users:
-            return await interaction.response.send_message('❌ You already made your choice!', ephemeral=True)
-        
-        # Assign choice
-        if interaction.user.id == self.user1.id:
-            self.user1_choice = 'heads'
-        else:
-            self.user2_choice = 'heads'
-        
-        self.chosen_users.append(interaction.user.id)
-        
-        # Disable the heads button
-        button.disabled = True
-        
-        # Update embed
-        mode_text = f"First to {self.total_rounds}" if self.is_first_to else f"Best of {self.total_rounds}"
-        embed = discord.Embed(
-            title='🪙 Choose Your Side',
-            description=f'**{self.user1.mention}** vs **{self.user2.mention}**\n\n**Mode:** {mode_text}\n\n**Select your side below:**',
-            color=MM_COLOR
-        )
-        
-        if self.user1_choice:
-            embed.add_field(name=f'{self.user1.display_name} has chosen', value=f'**{self.user1_choice.upper()}**', inline=False)
-        if self.user2_choice:
-            embed.add_field(name=f'{self.user2.display_name} has chosen', value=f'**{self.user2_choice.upper()}**', inline=False)
-        
-        await interaction.response.edit_message(embed=embed, view=self)
-        
-        # If both chosen, start the game
-        if len(self.chosen_users) == 2:
-            await asyncio.sleep(1)
-            await self.start_coinflip(interaction)
-    
-    @discord.ui.button(label='Tails', emoji='🪙', style=discord.ButtonStyle.secondary, custom_id='tails_cf')
-    async def tails_button(self, interaction: discord.Interaction, button: Button):
-        # Check if user is one of the two players
-        if interaction.user.id not in [self.user1.id, self.user2.id]:
-            return await interaction.response.send_message('❌ You are not part of this coinflip!', ephemeral=True)
-        
-        # Check if user already chose
-        if interaction.user.id in self.chosen_users:
-            return await interaction.response.send_message('❌ You already made your choice!', ephemeral=True)
-        
-        # Assign choice
-        if interaction.user.id == self.user1.id:
-            self.user1_choice = 'tails'
-        else:
-            self.user2_choice = 'tails'
-        
-        self.chosen_users.append(interaction.user.id)
-        
-        # Disable the tails button
-        button.disabled = True
-        
-        # Update embed
-        mode_text = f"First to {self.total_rounds}" if self.is_first_to else f"Best of {self.total_rounds}"
-        embed = discord.Embed(
-            title='🪙 Choose Your Side',
-            description=f'**{self.user1.mention}** vs **{self.user2.mention}**\n\n**Mode:** {mode_text}\n\n**Select your side below:**',
-            color=MM_COLOR
-        )
-        
-        if self.user1_choice:
-            embed.add_field(name=f'{self.user1.display_name} has chosen', value=f'**{self.user1_choice.upper()}**', inline=False)
-        if self.user2_choice:
-            embed.add_field(name=f'{self.user2.display_name} has chosen', value=f'**{self.user2_choice.upper()}**', inline=False)
-        
-        await interaction.response.edit_message(embed=embed, view=self)
-        
-        # If both chosen, start the game
-        if len(self.chosen_users) == 2:
-            await asyncio.sleep(1)
-            await self.start_coinflip(interaction)
-    
-    async def start_coinflip(self, interaction):
-        # Disable all buttons
-        for item in self.children:
-            item.disabled = True
-        
-        mode_text = f"First to {self.total_rounds}" if self.is_first_to else f"Best of {self.total_rounds}"
-        
-        # Starting embed
-        start_embed = discord.Embed(
-            title='🪙 Coinflip Starting!',
-            description=f'**{self.user1.mention}** chose **{self.user1_choice.upper()}**\n**{self.user2.mention}** chose **{self.user2_choice.upper()}**\n\n**Mode:** {mode_text}',
-            color=MM_COLOR
-        )
-        start_embed.timestamp = datetime.utcnow()
-        
-        await interaction.message.edit(embed=start_embed, view=self)
-        await asyncio.sleep(2)
-        
-        # Play rounds
-        user1_wins = 0
-        user2_wins = 0
-        rounds_played = 0
-        results = []
-        
-        while rounds_played < self.total_rounds:
-            flip_result = random.choice(['heads', 'tails'])
-            rounds_played += 1
-            
-            if flip_result == self.user1_choice:
-                user1_wins += 1
-                results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
-            else:
-                user2_wins += 1
-                results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
-            
-            # Check if someone won (first to mode)
-            if self.is_first_to and (user1_wins >= self.total_rounds or user2_wins >= self.total_rounds):
-                break
-            
-            # Update embed
-            progress_embed = discord.Embed(
-                title='🪙 Coinflip in Progress...',
-                description=f'**{self.user1.mention}** ({self.user1_choice.upper()}): {user1_wins} wins\n**{self.user2.mention}** ({self.user2_choice.upper()}): {user2_wins} wins\n\n**Mode:** {mode_text}\n**Rounds Played:** {rounds_played}/{self.total_rounds}',
-                color=0xFFA500
-            )
-            
-            # Show last 5 results
-            recent_results = '\n'.join(results[-5:])
-            progress_embed.add_field(name='Recent Results', value=recent_results if recent_results else 'None yet', inline=False)
-            progress_embed.timestamp = datetime.utcnow()
-            
-            await interaction.message.edit(embed=progress_embed, view=self)
-            await asyncio.sleep(1.5)
-        
-        # Determine final winner
-        if user1_wins > user2_wins:
-            final_winner = self.user1
-            final_color = 0x57F287
-        elif user2_wins > user1_wins:
-            final_winner = self.user2
-            final_color = 0x57F287
-        else:
-            final_winner = None
-            final_color = 0xFEE75C
-        
-        # Final embed
-        final_embed = discord.Embed(
-            title='🪙 Coinflip Complete!',
-            color=final_color
-        )
-        
-        if final_winner:
-            final_embed.description = f'🎊 **{final_winner.mention} WINS!** 🎊\n\n**Final Score:**\n{self.user1.mention}: {user1_wins} wins\n{self.user2.mention}: {user2_wins} wins'
-        else:
-            final_embed.description = f'🤝 **IT\'S A TIE!** 🤝\n\n**Final Score:**\n{self.user1.mention}: {user1_wins} wins\n{self.user2.mention}: {user2_wins} wins'
-        
-        final_embed.add_field(name='Mode', value=mode_text, inline=True)
-        final_embed.add_field(name='Total Rounds', value=str(rounds_played), inline=True)
-        
-        # Show all results if not too many
-        if rounds_played <= 10:
-            all_results = '\n'.join(results)
-            final_embed.add_field(name='All Results', value=all_results, inline=False)
-        else:
-            recent_results = '\n'.join(results[-10:])
-            final_embed.add_field(name='Last 10 Results', value=recent_results, inline=False)
-        
-        final_embed.timestamp = datetime.utcnow()
-        
-        await interaction.message.edit(embed=final_embed, view=self)
 
 # Events
 @bot.event
