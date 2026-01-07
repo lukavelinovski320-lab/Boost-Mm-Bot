@@ -82,6 +82,9 @@ MM_ROLE_IDS = {
     "og": 1458129476423778305            # OG MM role ID
 }
 
+SUPPORT_CATEGORY = 'Support Tickets'
+STAFF_ROLE_ID = 1458152494923251833
+
 def save_data():
     data = {
         'active_tickets': active_tickets,
@@ -192,6 +195,54 @@ class MMTradeModal(Modal, title='Middleman Trade Details'):
             await interaction.followup.send('✅ Middleman ticket created! Check the ticket channel.', ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f'❌ Error creating ticket: {str(e)}', ephemeral=True)
+
+# Support Ticket Modal
+class SupportTicketModal(Modal, title='Open Support Ticket'):
+    def __init__(self):
+        super().__init__()
+
+        self.reason = TextInput(
+            label='Reason for Support',
+            placeholder='Example: Need help with a trade, Report an issue, etc.',
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=1000
+        )
+
+        self.details = TextInput(
+            label='Additional Details',
+            placeholder='Provide any additional information...',
+            style=discord.TextStyle.paragraph,
+            required=False,
+            max_length=2000
+        )
+
+        self.add_item(self.reason)
+        self.add_item(self.details)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        try:
+            await create_support_ticket(
+                interaction.guild, 
+                interaction.user,
+                self.reason.value,
+                self.details.value if self.details.value else 'None provided'
+            )
+            await interaction.followup.send('✅ Support ticket created! Check the ticket channel.', ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f'❌ Error creating ticket: {str(e)}', ephemeral=True)
+
+# Support Ticket View (for inside the ticket)
+class SupportTicketView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    
+    @discord.ui.button(label='🔒 Close Ticket', style=discord.ButtonStyle.danger, custom_id='close_support_ticket')
+    async def close_button(self, interaction: discord.Interaction, button: Button):
+        await interaction.response.defer()
+        await close_ticket(interaction.channel, interaction.user)
 
 # Tier Selection Dropdown
 class TierSelect(Select):
@@ -319,7 +370,7 @@ class CoinflipView(View):
             await asyncio.sleep(1)
             await self.start_coinflip(interaction)
     
-    async def start_coinflip(self, interaction):
+    async def start_coinflip(self, interaction):  # ← FIXED: Removed extra space before 'async'
         for item in self.children:
             item.disabled = True
         
@@ -340,33 +391,65 @@ class CoinflipView(View):
         rounds_played = 0
         results = []
         
-        while rounds_played < self.total_rounds:
-            flip_result = random.choice(['heads', 'tails'])
-            rounds_played += 1
+        # FIXED: Different logic for First To vs Best Of
+        if self.is_first_to:
+            # First to X: Keep going until someone reaches X wins
+            while user1_wins < self.total_rounds and user2_wins < self.total_rounds:
+                flip_result = random.choice(['heads', 'tails'])
+                rounds_played += 1
+                
+                if flip_result == self.user1_choice:
+                    user1_wins += 1
+                    results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
+                else:
+                    user2_wins += 1
+                    results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
+                
+                progress_embed = discord.Embed(
+                    title='🪙 Coinflip in Progress...',
+                    description=f'**{self.user1.mention}** ({self.user1_choice.upper()}): {user1_wins} wins\n**{self.user2.mention}** ({self.user2_choice.upper()}): {user2_wins} wins\n\n**Mode:** {mode_text}\n**Rounds Played:** {rounds_played}',
+                    color=0xFFA500
+                )
+                
+                recent_results = '\n'.join(results[-5:])
+                progress_embed.add_field(name='Recent Results', value=recent_results if recent_results else 'None yet', inline=False)
+                progress_embed.timestamp = datetime.utcnow()
+                
+                await interaction.message.edit(embed=progress_embed, view=self)
+                await asyncio.sleep(1.5)
+        else:
+            # Best of X: Play exactly X rounds, winner has most wins
+            rounds_to_win = (self.total_rounds // 2) + 1  # e.g., bo10 = need 6 wins
             
-            if flip_result == self.user1_choice:
-                user1_wins += 1
-                results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
-            else:
-                user2_wins += 1
-                results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
-            
-            if self.is_first_to and (user1_wins >= self.total_rounds or user2_wins >= self.total_rounds):
-                break
-            
-            progress_embed = discord.Embed(
-                title='🪙 Coinflip in Progress...',
-                description=f'**{self.user1.mention}** ({self.user1_choice.upper()}): {user1_wins} wins\n**{self.user2.mention}** ({self.user2_choice.upper()}): {user2_wins} wins\n\n**Mode:** {mode_text}\n**Rounds Played:** {rounds_played}/{self.total_rounds}',
-                color=0xFFA500
-            )
-            
-            recent_results = '\n'.join(results[-5:])
-            progress_embed.add_field(name='Recent Results', value=recent_results if recent_results else 'None yet', inline=False)
-            progress_embed.timestamp = datetime.utcnow()
-            
-            await interaction.message.edit(embed=progress_embed, view=self)
-            await asyncio.sleep(1.5)
+            while rounds_played < self.total_rounds:
+                flip_result = random.choice(['heads', 'tails'])
+                rounds_played += 1
+                
+                if flip_result == self.user1_choice:
+                    user1_wins += 1
+                    results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user1.mention} wins! 🎉")
+                else:
+                    user2_wins += 1
+                    results.append(f"Round {rounds_played}: **{flip_result.upper()}** - {self.user2.mention} wins! 🎉")
+                
+                # Early finish if someone already won majority
+                if user1_wins >= rounds_to_win or user2_wins >= rounds_to_win:
+                    break
+                
+                progress_embed = discord.Embed(
+                    title='🪙 Coinflip in Progress...',
+                    description=f'**{self.user1.mention}** ({self.user1_choice.upper()}): {user1_wins} wins\n**{self.user2.mention}** ({self.user2_choice.upper()}): {user2_wins} wins\n\n**Mode:** {mode_text}\n**Rounds Played:** {rounds_played}/{self.total_rounds}',
+                    color=0xFFA500
+                )
+                
+                recent_results = '\n'.join(results[-5:])
+                progress_embed.add_field(name='Recent Results', value=recent_results if recent_results else 'None yet', inline=False)
+                progress_embed.timestamp = datetime.utcnow()
+                
+                await interaction.message.edit(embed=progress_embed, view=self)
+                await asyncio.sleep(1.5)
         
+        # Determine winner
         if user1_wins > user2_wins:
             final_winner = self.user1
             final_color = 0x57F287
@@ -396,7 +479,6 @@ class CoinflipView(View):
         else:
             recent_results = '\n'.join(results[-10:])
             final_embed.add_field(name='Last 10 Results', value=recent_results, inline=False)
-
         
         await interaction.message.edit(embed=final_embed, view=self)
 
@@ -469,6 +551,7 @@ async def on_ready():
     
     bot.add_view(TierSelectView())
     bot.add_view(MMTicketView())
+    bot.add_view(SupportTicketView())
     
     load_data()
 
@@ -483,7 +566,6 @@ async def setup(ctx):
         color=MM_COLOR
     )
     embed.set_footer(text='Select your tier to get started')
-    embed.timestamp = datetime.utcnow()
     
     view = View(timeout=None)
     button = Button(label='Open MM Ticket', emoji='⚖️', style=discord.ButtonStyle.primary, custom_id='open_mm_ticket')
@@ -494,6 +576,32 @@ async def setup(ctx):
             color=MM_COLOR
         )
         await interaction.response.send_message(embed=tier_embed, view=TierSelectView(), ephemeral=True)
+    
+    button.callback = button_callback
+    view.add_item(button)
+    
+    await ctx.send(embed=embed, view=view)
+    await ctx.message.delete()
+
+# Support Setup Command
+@bot.command(name='supportsetup')
+@commands.has_permissions(administrator=True)
+async def support_setup(ctx):
+    """Create Support ticket panel"""
+    embed = discord.Embed(
+        title='🎫 Support Center',
+        description='Need help? Open a support ticket below!\n\n**What can you use support for?**\n• General Support\n• Claiming a Prize\n• Partnership Inquiries\n• Report an Issue\n• Other Questions',
+        color=MM_COLOR
+    )
+    embed.set_footer(text='Click the button below to open a ticket')
+    embed.timestamp = datetime.utcnow()
+    
+    view = View(timeout=None)
+    button = Button(label='Open Support Ticket', emoji='🎫', style=discord.ButtonStyle.primary, custom_id='open_support_ticket')
+    
+    async def button_callback(interaction: discord.Interaction):
+        modal = SupportTicketModal()
+        await interaction.response.send_modal(modal)
     
     button.callback = button_callback
     view.add_item(button)
@@ -658,7 +766,7 @@ async def proof_command(ctx):
     embed.add_field(name='Gave', value=giving, inline=False)
     embed.add_field(name='Received', value=receiving, inline=False)
 
-    ticket_number = ctx.channel.name.replace('ticket-', '')
+    ticket_number = ctx.channel.name.replae('ticket-', '')
     embed.set_footer(text=f"Ticket #{ticket_number}")
     embed.timestamp = datetime.utcnow()
 
@@ -686,6 +794,7 @@ async def help_command(ctx):
     embed.add_field(
         name='🎫 Ticket Commands',
         value='`$mmsetup` - Create MM ticket panel (Admin only)\n'
+              '`$supportsetup` - Create Support ticket panel (Admin only)\n'
               '`$claim` - Claim a ticket\n'
               '`$unclaim` - Unclaim a ticket\n'
               '`$close` - Close a ticket\n'
@@ -703,11 +812,12 @@ async def help_command(ctx):
     )
     
     embed.add_field(
-        name='🪙 Fun Commands',
-        value='`$cf @user1 vs @user2 [ft] <number>` - Coinflip game\n'
-              'Examples:\n'
-              '• `$cf @user1 vs @user2 ft 3` (First to 3)\n'
-              '• `$cf user1 vs user2 5` (Best of 5)',
+        name='🪙 Coinflip Commands',
+        value='`$cf @user1 vs @user2 ft <number>` - First to X wins\n'
+              '`$cf @user1 vs @user2 bo <number>` - Best of X rounds\n\n'
+              '**Examples:**\n'
+              '• `$cf @user1 vs @user2 ft 10` (First to reach 10 wins)\n'
+              '• `$cf @user1 vs @user2 bo 10` (Best of 10 rounds, need 6 to win)',
         inline=False
     )
     
@@ -748,7 +858,6 @@ async def mmstats_command(ctx, member: discord.Member = None):
         )
     
     embed.set_thumbnail(url=target.display_avatar.url)
-    embed.timestamp = datetime.utcnow()
     
     await ctx.reply(embed=embed)
 
@@ -977,13 +1086,13 @@ async def create_ticket_with_details(guild, user, tier, trader, giving, receivin
             'tip': tip
         }
         
-        # Ping ONLY the specific tier role
+        # GHOST PING: Ping tier role and user, then delete
         tier_role_id = MM_ROLE_IDS.get(tier)
         tier_role = guild.get_role(tier_role_id) if tier_role_id else None
         
         if tier_role:
-            ping_message = f"{tier_role.mention} - New {MM_TIERS[tier]['name']} ticket opened!"
-            await ticket_channel.send(ping_message, allowed_mentions=discord.AllowedMentions(roles=True))
+            ping_msg = await ticket_channel.send(f"{tier_role.mention} {user.mention}")
+            await ping_msg.delete()
         
         # Combined embed
         embed = discord.Embed(
@@ -1062,6 +1171,94 @@ async def close_ticket(channel, user):
     await asyncio.sleep(5)
     await channel.delete()
 
+ async def create_support_ticket(guild, user, reason, details):
+    """Create a support ticket with staff ping and ghost ping"""
+    try:
+        category = discord.utils.get(guild.categories, name=SUPPORT_CATEGORY)
+        if not category:
+            category = await guild.create_category(SUPPORT_CATEGORY)
+        
+        # Get staff role
+        staff_role = guild.get_role(STAFF_ROLE_ID)
+        
+        # Base overwrites
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            user: discord.PermissionOverwrite(
+                view_channel=True, 
+                send_messages=True, 
+                read_message_history=True
+            ),
+            guild.me: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                manage_channels=True,
+                manage_messages=True
+            )
+        }
+        
+        # Add staff role permissions
+        if staff_role:
+            overwrites[staff_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                manage_messages=True
+            )
+        
+        # Create ticket channel
+        ticket_channel = await guild.create_text_channel(
+            name=f'ticket-{user.name}-support',
+            category=category,
+            overwrites=overwrites
+        )
+        
+        # Store ticket data
+        active_tickets[ticket_channel.id] = {
+            'user_id': user.id,
+            'created_at': datetime.utcnow().isoformat(),
+            'type': 'support',
+            'reason': reason,
+            'details': details
+        }
+        
+        # GHOST PING: Ping user and staff, then delete it
+        if staff_role:
+            ping_msg = await ticket_channel.send(f"{staff_role.mention} {user.mention}")
+            await ping_msg.delete()
+        
+        # Send ticket embed
+        embed = discord.Embed(
+            title='🎫 Support Ticket',
+            description=f"Welcome {user.mention}!\n\nOur staff team will be with you shortly.",
+            color=MM_COLOR
+        )
+        
+        embed.add_field(
+            name="📋 Reason",
+            value=reason,
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📝 Details",
+            value=details,
+            inline=False
+        )
+        
+        embed.set_footer(
+            text=f'Ticket created by {user.name}',
+            icon_url=user.display_avatar.url
+        )
+        embed.timestamp = datetime.utcnow()
+        
+        await ticket_channel.send(embed=embed, view=SupportTicketView())
+        save_data()
+        
+    except Exception as e:
+        print(f'[ERROR] Support Ticket creation failed: {e}')
+        raise
+        
 # Run Bot
 if __name__ == '__main__':
     keep_alive()
