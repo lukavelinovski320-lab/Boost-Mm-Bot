@@ -814,6 +814,7 @@ async def help_command(ctx):
     embed.add_field(
         name='🪙 Coinflip Commands',
         value='`$cf @user1 vs @user2 ft <number>` - First to X wins\n'
+              '`$coinflip` - Flip a single coin (heads or tails)\n'
               '`$cf @user1 vs @user2 bo <number>` - Best of X rounds\n\n'
               '**Examples:**\n'
               '• `$cf @user1 vs @user2 ft 10` (First to reach 10 wins)\n'
@@ -951,6 +952,36 @@ async def unclaim_command(ctx):
     
     await ctx.reply(embed=embed)
     save_data()
+
+# Simple Coinflip Command
+@bot.command(name='coinflip')
+async def simple_coinflip(ctx):
+    """Flip a single coin"""
+    
+    # Flipping animation
+    embed = discord.Embed(
+        title='ðŸª™ Flipping Coin...',
+        description='The coin is in the air!',
+        color=MM_COLOR
+    )
+    embed.timestamp = datetime.utcnow()
+    
+    msg = await ctx.reply(embed=embed)
+    await asyncio.sleep(1.5)
+    
+    # Get result
+    result = random.choice(['Heads', 'Tails'])
+    
+    # Result embed
+    result_embed = discord.Embed(
+        title=f'ðŸª™ {result}!',
+        description=f'The coin landed on **{result}**!',
+        color=0x57F287 if result == 'Heads' else 0x5865F2
+    )
+    result_embed.set_footer(text=f'Flipped by {ctx.author.name}', icon_url=ctx.author.display_avatar.url)
+    result_embed.timestamp = datetime.utcnow()
+    
+    await msg.edit(embed=result_embed)
 
 # Coinflip Command
 @bot.command(name='cf')
