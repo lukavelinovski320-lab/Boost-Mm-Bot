@@ -167,7 +167,7 @@ class TierSelect(Select):
             ),
             discord.SelectOption(
                 label='OG Middleman',
-                description='Premium service for all trades',
+                description='Og Trades Only',
                 value='og',
                 emoji='💎'
             )
@@ -239,7 +239,7 @@ class MMTicketView(View):
             )
         
         embed = discord.Embed(
-            description=f'✅ Ticket claimed by {interaction.user.mention}\n\n🔒 **Only the claimer and ticket creator can now send messages.**',
+            description=f'✅ Ticket claimed by {interaction.user.mention}\n\n🔒 **Only the claimer and ticket creator are allowed to talk.**',
             color=0x57F287
         )
         embed.timestamp = datetime.utcnow()
