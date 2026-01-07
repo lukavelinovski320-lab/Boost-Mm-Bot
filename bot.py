@@ -892,7 +892,6 @@ async def mmleaderboard_command(ctx):
         embed.description = 'No data available'
     
     embed.set_footer(text=f'Total Middlemen: {len(mm_stats)}')
-    embed.timestamp = datetime.utcnow()
     
     await ctx.reply(embed=embed)
 
@@ -948,7 +947,6 @@ async def unclaim_command(ctx):
         description=f'✅ Ticket unclaimed by {ctx.author.mention}\n\n🔓 **All eligible middlemen can now claim this ticket again.**',
         color=MM_COLOR
     )
-    embed.timestamp = datetime.utcnow()
     
     await ctx.reply(embed=embed)
     save_data()
@@ -960,11 +958,10 @@ async def simple_coinflip(ctx):
     
     # Flipping animation
     embed = discord.Embed(
-        title='ðŸª™ Flipping Coin...',
+        title=' Flipping Coin...',
         description='The coin is in the air!',
         color=MM_COLOR
     )
-    embed.timestamp = datetime.utcnow()
     
     msg = await ctx.reply(embed=embed)
     await asyncio.sleep(1.5)
@@ -974,12 +971,11 @@ async def simple_coinflip(ctx):
     
     # Result embed
     result_embed = discord.Embed(
-        title=f'ðŸª™ {result}!',
+        title=f'{result}!',
         description=f'The coin landed on **{result}**!',
         color=0x57F287 if result == 'Heads' else 0x5865F2
     )
     result_embed.set_footer(text=f'Flipped by {ctx.author.name}', icon_url=ctx.author.display_avatar.url)
-    result_embed.timestamp = datetime.utcnow()
     
     await msg.edit(embed=result_embed)
 
@@ -1054,7 +1050,7 @@ async def coinflip(ctx, user1_input: str = None, vs: str = None, user2_input: st
         description=f'**{user1.mention}** vs **{user2.mention}**\n\n**Mode:** {mode_text}\n\n**Select your side below:**',
         color=MM_COLOR
     )
-    embed.timestamp = datetime.utcnow()
+    
     
     view = CoinflipView(user1, user2, total_rounds, is_first_to)
     await ctx.send(embed=embed, view=view)
